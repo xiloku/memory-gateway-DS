@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 
 // ===== Supabase REST 配置 =====
-const SB_URL = process.env.SUPABASE_URL || 'ncohjkoqwszybqqvyqdp.supabase.co';
+const SB_URL = process.env.SUPABASE_URL || '';
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 // ===== 混元 Vision API 配置 =====
