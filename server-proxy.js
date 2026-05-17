@@ -321,7 +321,7 @@ async function processRequest(payload, sessionId) {
         return {
             jsonrpc: '2.0', id: id,
             result: {
-                protocolVersion: '2025-06-18',
+                protocolVersion: '2024-11-05',
                 capabilities: { tools: {} },
                 serverInfo: { name: 'deepseek-mcp', version: '2.7.1-proxy' }
             }
