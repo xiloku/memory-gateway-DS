@@ -120,4 +120,4 @@ const server = http.createServer((req, res) => {
     });
 });
 
-server.listen(3100, '127.0.0.1', () => console.log('助手记忆服务已启动 -> 127.0.0.1:3100'));
+server.listen(3100, '0.0.0.0', () => console.log('助手记忆服务已启动 -> 0.0.0.0:3100'));
