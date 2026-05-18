@@ -437,6 +437,71 @@ async function processRequest(payload, sessionId) {
             }
         }
 
+if (toolName === 'web_search') {
+    if (!args.query) return { jsonrpc: '2.0', id: id, error: { code: -32602, message: '缺少 query 参数' } };
+    try {
+        const searchRes = await new Promise((resolve, reject) => {
+            const body = JSON.stringify({ query: args.query, count: 5 });
+            const req = https.request({
+                hostname: 'api.bochaai.com',
+                path: '/v1/web-search',
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + process.env.BOCHA_API_KEY
+                }
+            }, (res) => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => {
+                    try { resolve(JSON.parse(data)); }
+                    catch (e) { reject(new Error('博查响应解析失败')); }
+                });
+            });
+            req.on('error', (e) => reject(e));
+            req.write(body);
+            req.end();
+        });
+        
+        const webPages = searchRes.data?.webPages || searchRes.webPages || {};
+        const results = webPages.value || [];
+        const summary = results.length > 0
+            ? results.map(r => `- ${r.name}: ${r.snippet || ''}`).join('\n')
+            : '未找到相关结果。';
+        
+        return { jsonrpc: '2.0', id: id, result: { content: [{ type: 'text', text: summary }] } };
+    } catch (e) {
+        return { jsonrpc: '2.0', id: id, error: { code: -32603, message: 'web_search 失败: ' + e.message } };
+    }
+}
+
+if (toolName === 'web_fetch') {
+    if (!args.url) return { jsonrpc: '2.0', id: id, error: { code: -32602, message: '缺少 url 参数' } };
+    try {
+        const html = await new Promise((resolve, reject) => {
+            https.get(args.url, (res) => {
+                let data = '';
+                res.on('data', c => data += c);
+                res.on('end', () => resolve(data));
+            }).on('error', (e) => reject(e));
+        });
+        
+        // 简易文本提取（去掉标签）
+        const text = html
+            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/&nbsp;/g, ' ')
+            .replace(/\s{2,}/g, '\n')
+            .trim()
+            .slice(0, 4000);
+        
+        return { jsonrpc: '2.0', id: id, result: { content: [{ type: 'text', text: text || '(无法提取网页内容)' }] } };
+    } catch (e) {
+        return { jsonrpc: '2.0', id: id, error: { code: -32603, message: 'web_fetch 失败: ' + e.message } };
+    }
+}
+
         if (toolName === 'image_to_text') {
             if (!args.image_url) return { jsonrpc: '2.0', id: id, error: { code: -32602, message: '缺少 image_url' } };
             try {
