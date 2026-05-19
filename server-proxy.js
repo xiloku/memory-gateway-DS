@@ -336,10 +336,8 @@ async function processRequest(payload, sessionId) {
                     { name: 'web_search', description: '搜索网页', inputSchema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } },
                     { name: 'web_fetch', description: '抓取网页', inputSchema: { type: 'object', properties: { url: { type: 'string' } }, required: ['url'] } },
                     { name: 'execute_command', description: '在服务器上执行命令', inputSchema: { type: 'object', properties: { command: { type: 'string' } }, required: ['command'] } },
-                    { name: 'file_read', description: '读取文件内容', inputSchema: { type: 'object', properties: { path: { type: 'string', description: '文件路径（仅限 /opt/omni-ob-vault/ 和 /opt/deepseek-workspace/ 下）' } }, required: ['path'] } },
-                    { name: 'file_write', description: '写入文件内容（覆盖模式）', inputSchema: { type: 'object', properties: { path: { type: 'string', description: '文件路径（仅限 /opt/omni-ob-vault/ 和 /opt/deepseek-workspace/ 下）' }, content: { type: 'string', description: '要写入的内容' } }, required: ['path', 'content'] } },
-                    { name: 'context_save', description: '保存对话到Supabase记忆库', inputSchema: { type: 'object', properties: { role: { type: 'string', description: '角色: user 或 assistant' }, content: { type: 'string', description: '对话内容' } }, required: ['role', 'content'] } },
-                    { name: 'context_load', description: '从Supabase记忆库读取最近对话', inputSchema: { type: 'object', properties: { limit: { type: 'number', description: '读取条数，默认20' } }, required: [] } },
+                    { name: 'file_read', description: '读取文件内容', inputSchema: { type: 'object', properties: { path: { type: 'string', description: '文件路径（仅限 /app/omni-ob-vault/ 和 /app/deepseek-workspace/ 下）' } }, required: ['path'] } },
+                    { name: 'file_write', description: '写入文件内容（覆盖模式）', inputSchema: { type: 'object', properties: { path: { type: 'string', description: '文件路径（仅限 /app/omni-ob-vault/ 和 /app/deepseek-workspace/ 下）' }, content: { type: 'string', description: '要写入的内容' } }, required: ['path', 'content'] } },
                     { name: 'image_to_text', description: '调用混元Vision识别图片内容，支持图片URL或base64', inputSchema: { type: 'object', properties: { image_url: { type: 'string', description: '图片URL或base64数据' }, prompt: { type: 'string', description: '可选，提示词' } }, required: ['image_url'] } }
                 ]
             }
@@ -355,10 +353,10 @@ async function processRequest(payload, sessionId) {
             if (!cmd) return { jsonrpc: '2.0', id: id, error: { code: -32602, message: 'Missing command' } };
             // 🔒 保险：修改 server-proxy.js 的命令自动备份
             if (cmd.includes('server-proxy.js')) {
-                const bakDir = '/opt/deepseek-workspace/backups';
+                const bakDir = '/app/deepseek-workspace/backups';
                 fs.mkdirSync(bakDir, { recursive: true });
                 const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-                const src = '/opt/deepseek-workspace/server-proxy.js';
+                const src = '/app/deepseek-workspace/server-proxy.js';
                 if (fs.existsSync(src)) {
                     fs.copyFileSync(src, bakDir + '/server-proxy.js.' + ts);
                     const baks = fs.readdirSync(bakDir).filter(function(f){return f.startsWith('server-proxy.js.')}).sort();
@@ -366,7 +364,7 @@ async function processRequest(payload, sessionId) {
                 }
             }
             return new Promise((resolve) => {
-                exec(cmd, { timeout: 30000, cwd: '/opt/deepseek-workspace' }, (err, stdout, stderr) => {
+                exec(cmd, { timeout: 30000, cwd: '/app/deepseek-workspace' }, (err, stdout, stderr) => {
                     const text = err ? 'Error: ' + (stderr || err.message) : (stdout || '(executed successfully)');
                     resolve({ jsonrpc: '2.0', id: id, result: { content: [{ type: 'text', text }] } });
                 });
@@ -374,7 +372,7 @@ async function processRequest(payload, sessionId) {
         }
 
         if (toolName === 'file_read') {
-            const allowed = ['/opt/omni-ob-vault', '/opt/deepseek-workspace'];
+            const allowed = ['/app/omni-ob-vault', '/app/deepseek-workspace'];
             if (!allowed.some(r => args.path.startsWith(r)))
                 return { jsonrpc: '2.0', id: id, error: { code: -32602, message: '拒绝：路径不在允许范围' } };
             try {
@@ -386,13 +384,13 @@ async function processRequest(payload, sessionId) {
         }
 
         if (toolName === 'file_write') {
-            const allowed = ['/opt/omni-ob-vault', '/opt/deepseek-workspace'];
+            const allowed = ['/app/omni-ob-vault', '/app/deepseek-workspace'];
             if (!allowed.some(r => args.path.startsWith(r)))
                 return { jsonrpc: '2.0', id: id, error: { code: -32602, message: '拒绝：路径不在允许范围' } };
             try {
                 // 🔒 保险：写入 server-proxy.js 前自动备份
                 if (args.path.includes('server-proxy.js')) {
-                    const bakDir = '/opt/deepseek-workspace/backups';
+                    const bakDir = '/app/deepseek-workspace/backups';
                     fs.mkdirSync(bakDir, { recursive: true });
                     const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
                     const bakPath = bakDir + '/server-proxy.js.' + ts;
@@ -410,32 +408,6 @@ async function processRequest(payload, sessionId) {
             }
         }
 
-        if (toolName === 'context_save') {
-            const { role, content } = args;
-            if (!role || !content) return { jsonrpc: '2.0', id: id, error: { code: -32602, message: '缺少 role 或 content' } };
-            if (!['user', 'assistant'].includes(role)) return { jsonrpc: '2.0', id: id, error: { code: -32602, message: 'role 必须是 user 或 assistant' } };
-            try {
-                const r = await sbRequest('POST', '/ds_conversations', { role, content });
-                if (r.status >= 300) throw new Error('HTTP ' + r.status + ': ' + JSON.stringify(r.data));
-                return { jsonrpc: '2.0', id: id, result: { content: [{ type: 'text', text: '[已保存] ' + role + ': ' + content.slice(0, 100) + '...' }] } };
-            } catch (e) {
-                return { jsonrpc: '2.0', id: id, error: { code: -32603, message: 'context_save 失败: ' + e.message } };
-            }
-        }
-
-        if (toolName === 'context_load') {
-            const limit = Math.min(args.limit || 35, 100);
-            try {
-                const r = await sbRequest('GET', '/ds_conversations?select=role,content,created_at&order=created_at.desc&limit=' + limit);
-                if (r.status >= 300) throw new Error('HTTP ' + r.status);
-                if (!r.data || r.data.length === 0)
-                    return { jsonrpc: '2.0', id: id, result: { content: [{ type: 'text', text: '(记忆库为空)' }] } };
-                const lines = r.data.reverse().map(function(row){ return '[' + row.role + '] ' + row.content.slice(0,500) + (row.content.length>500?'...(截断)':''); });
-                return { jsonrpc: '2.0', id: id, result: { content: [{ type: 'text', text: lines.join('\n---\n') }] } };
-            } catch (e) {
-                return { jsonrpc: '2.0', id: id, error: { code: -32603, message: 'context_load 失败: ' + e.message } };
-            }
-        }
 
 if (toolName === 'web_search') {
     if (!args.query) return { jsonrpc: '2.0', id: id, error: { code: -32602, message: '缺少 query 参数' } };
